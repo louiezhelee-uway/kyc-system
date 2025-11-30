@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}错误 - KYC 验证系统{% endblock %}
+
+{% block content %}
+<div style="text-align: center;">
+    <h1 style="color: #dc3545; font-size: 48px; margin-bottom: 20px;">⚠️</h1>
+    <h2>发生错误</h2>
+    
+    <div class="status error" style="margin: 30px 0;">
+        {{ message }}
+    </div>
+    
+    <p>如果问题持续，请联系客户服务。</p>
+    
+    <a href="/" class="button">返回首页</a>
+</div>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}KYC 验证 - 订单 {{ order.taobao_order_id }}{% endblock %}
+
+{% block content %}
+<h1>身份验证</h1>
+
+<div class="info-box">
+    <p><strong>订单号:</strong> {{ order.taobao_order_id }}</p>
+    <p><strong>买家:</strong> {{ order.buyer_name }}</p>
+    <p><strong>邮箱:</strong> {{ order.buyer_email }}</p>
+</div>
+
+<p>为了完成您的订单，我们需要进行身份验证。请点击下方按钮进行身份验证。</p>
+
+<p>验证过程通常需要 5-10 分钟，请准备好您的身份证件。</p>
+
+<center>
+    <a href="{{ verification_link }}" class="button">开始验证</a>
+</center>
+
+<p style="margin-top: 30px; font-size: 12px; color: #999; text-align: center;">
+    验证由独立第三方 Sumsub 提供。您的个人信息将被安全加密处理。
+</p>
+
+<div class="footer">
+    <p>如您有任何问题，请联系我们的客户服务团队。</p>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    center {
+        display: flex;
+        justify-content: center;
+    }
+</style>
+{% endblock %}
