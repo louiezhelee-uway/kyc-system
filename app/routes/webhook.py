@@ -40,9 +40,15 @@ def taobao_order_webhook():
         data = request.get_json()
         
         # Extract order information
+        # buyer_id is optional - if not provided, use buyer_name or order_id
+        buyer_id = data.get('buyer_id')
+        if not buyer_id:
+            # Generate buyer_id from buyer_name or order_id
+            buyer_id = data.get('buyer_name', data.get('order_id', 'unknown'))
+        
         order_data = {
             'taobao_order_id': data.get('order_id'),
-            'buyer_id': data.get('buyer_id'),
+            'buyer_id': buyer_id,
             'buyer_name': data.get('buyer_name'),
             'buyer_email': data.get('buyer_email'),
             'buyer_phone': data.get('buyer_phone'),
