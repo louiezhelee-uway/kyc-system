@@ -8,4 +8,6 @@ Werkzeug==2.3.7
 reportlab==4.0.7
 PyPDF2==3.0.1
 Pillow==10.0.0
-sumsub-sdk==0.2.3
+# 注意: Sumsub 没有官方 Python pip 包
+# 使用 requests 库调用 Sumsub REST API 替代
+# 参考: SUMSUB_INTEGRATION.md
