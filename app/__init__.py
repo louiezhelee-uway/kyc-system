@@ -32,10 +32,32 @@ def create_app():
         }), 200
     
     # Register blueprints
-    from app.routes import webhook, verification, report
-    app.register_blueprint(webhook.bp)
-    app.register_blueprint(verification.bp)
-    app.register_blueprint(report.bp)
+    try:
+        from app.routes import webhook
+        app.register_blueprint(webhook.bp)
+        print("✅ webhook 蓝图已注册")
+    except Exception as e:
+        print(f"❌ webhook 蓝图注册失败: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    try:
+        from app.routes import verification
+        app.register_blueprint(verification.bp)
+        print("✅ verification 蓝图已注册")
+    except Exception as e:
+        print(f"❌ verification 蓝图注册失败: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    try:
+        from app.routes import report
+        app.register_blueprint(report.bp)
+        print("✅ report 蓝图已注册")
+    except Exception as e:
+        print(f"❌ report 蓝图注册失败: {e}")
+        import traceback
+        traceback.print_exc()
     
     # Global error handler
     @app.errorhandler(Exception)

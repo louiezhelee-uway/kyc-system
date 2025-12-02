@@ -75,6 +75,9 @@ def taobao_order_webhook():
         
     except Exception as e:
         db.session.rollback()
+        print(f"❌ Webhook 错误: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @bp.route('/sumsub/verification', methods=['POST'])
