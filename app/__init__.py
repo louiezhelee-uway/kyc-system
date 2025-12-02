@@ -59,10 +59,16 @@ def create_app():
         import traceback
         traceback.print_exc()
     
-    # Global error handler
+    # Global error handler (只处理非 HTTP 异常)
     @app.errorhandler(Exception)
     def handle_exception(error):
         """全局异常处理"""
+        from werkzeug.exceptions import HTTPException
+        
+        # 如果是 HTTP 异常（如 404），使用默认处理
+        if isinstance(error, HTTPException):
+            return error
+        
         import traceback
         
         # 打印完整的错误堆栈到控制台
