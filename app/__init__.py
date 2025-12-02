@@ -37,14 +37,35 @@ def create_app():
     app.register_blueprint(verification.bp)
     app.register_blueprint(report.bp)
     
-    # Create tables (only in development, skip if database connection fails)
+    # Global error handler
+    @app.errorhandler(Exception)
+    def handle_exception(error):
+        """全局异常处理"""
+        import traceback
+        
+        # 打印完整的错误堆栈到控制台
+        print(f"\n❌ 应用异常: {error}")
+        traceback.print_exc()
+        print()
+        
+        # 返回错误详情
+        return jsonify({
+            'error': str(error),
+            'type': type(error).__name__,
+            'status': 'error'
+        }), 500
+    
+    # Create tables
     with app.app_context():
         try:
             db.create_all()
+            print("✅ 数据库表已创建或已存在")
         except Exception as e:
-            if os.getenv('FLASK_ENV') == 'development':
-                app.logger.warning(f"无法创建数据库表: {e}")
-            else:
-                raise
+            print(f"⚠️  警告: 无法创建数据库表: {e}")
+            # 仍然继续，让应用运行
+            # 在 DEBUG 模式下打印完整的错误堆栈
+            if os.getenv('FLASK_DEBUG') == '1':
+                import traceback
+                traceback.print_exc()
     
     return app
