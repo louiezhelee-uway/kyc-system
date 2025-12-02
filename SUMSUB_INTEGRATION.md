@@ -1,247 +1,433 @@
-# Sumsub KYC 集成完成指南
+# 🔐 Sumsub WebSDK 集成指南 - 正确方案
 
-## ✅ 已完成的工作
+## ⚠️ 重要提示
 
-### 1. Sumsub API 集成
-- ✅ API 凭证已配置在 `.env` 文件
-- ✅ HMAC-SHA256 签名认证已实现
-- ✅ 所有核心功能已集成:
-  - `create_verification()` - 创建验证
-  - `_generate_access_token()` - 生成 Web SDK 令牌
-  - `update_verification_status()` - 更新验证状态
-  - `get_verification_result()` - 获取验证结果
-  - `generate_pdf_report()` - 生成 PDF 报告
+**❌ 错误做法**: `pip install sumsub`  
+**原因**: Sumsub 在 PyPI 上没有官方 Python 包！
 
-### 2. 凭证配置
-```
-API Token: prd:1b15gKkFtPh440hQSOXIvjR3.OSJVLkmtJfnWVPS7IpuKCI2Tas4giOCO
-Secret Key: CTHMPDlqphQmvB2fqBC7b6wF5v9iyqoK
-API URL: https://api.sumsub.com
-```
-
-### 3. 测试验证
-```bash
-# 运行 Sumsub 集成测试
-python3 tests/test_sumsub_integration.py
-
-# ✅ 输出显示:
-# - API Token: ✓ Set
-# - Secret Key: ✓ Set  
-# - 签名认证: HMAC-SHA256 ✓
-# - Services: 5/5 functions available ✓
-# - Connection: OK (Status 403 - 预期)
-```
-
-## 🚀 启动应用
-
-### 方式 1: 快速启动 (推荐)
-```bash
-cd /Users/louie/Library/Mobile\ Documents/com~apple~CloudDocs/Documents/project\ X/Project_KYC
-
-./quick-start.sh
-```
-
-### 方式 2: Docker 手动启动
-```bash
-docker-compose up -d
-
-# 查看日志
-docker-compose logs -f web
-```
-
-### 方式 3: Make 命令
-```bash
-make start
-make logs
-```
-
-## 📋 运行完整集成测试
-
-首先启动 Docker，然后运行:
-```bash
-python3 tests/test_full_integration.py
-```
-
-预期输出:
-```
-✅ 1. 检查数据库连接...
-✅ 2. 测试数据库模型...
-✅ 3. 测试 API 路由...
-✅ 4. 测试 Sumsub 服务集成...
-✅ 5. 测试报告生成服务...
-✅ 6. 测试 Webhook 安全认证...
-```
-
-## 🔄 完整工作流
-
-### 1. 接收订单 Webhook
-```bash
-POST /webhook/taobao/order
-Content-Type: application/json
-
-{
-  "order_id": "123456789",
-  "buyer_id": "buyer_123",
-  "buyer_name": "张三",
-  "buyer_email": "zhangsan@example.com",
-  "buyer_phone": "+86 13800138000",
-  "platform": "taobao",
-  "order_amount": 99.99
-}
-```
-
-### 2. 自动创建 Sumsub 验证
-系统会:
-- 在 Sumsub 中创建 Applicant
-- 生成 Access Token
-- 创建验证链接
-- 返回给客户端
-
-### 3. 客户验证
-客户访问验证页面并通过 Sumsub Web SDK 完成 KYC
-
-### 4. 接收验证结果
-```bash
-POST /webhook/sumsub/verification
-Content-Type: application/json
-
-{
-  "applicantId": "abc123",
-  "reviewStatus": "approved"
-}
-```
-
-### 5. 生成 PDF 报告
-验证完成后自动生成 PDF 报告
-
-## 📊 API 端点
-
-| 端点 | 方法 | 说明 |
-|------|------|------|
-| `/webhook/taobao/order` | POST | 接收淘宝/闲鱼订单 |
-| `/webhook/sumsub/verification` | POST | 接收 Sumsub 验证结果 |
-| `/verify/<token>` | GET | 显示验证页面 |
-| `/verify/status/<token>` | GET | 获取验证状态 |
-| `/report/<order_id>` | GET | 查看报告 |
-| `/report/<order_id>/download` | GET | 下载 PDF 报告 |
-
-## 🔐 环境变量
-
-所有敏感信息存储在 `.env` 和 `.env.docker`:
-
-```env
-# .env - 本地开发
-SUMSUB_APP_TOKEN=prd:1b15gKkFtPh440hQSOXIvjR3.OSJVLkmtJfnWVPS7IpuKCI2Tas4giOCO
-SUMSUB_SECRET_KEY=CTHMPDlqphQmvB2fqBC7b6wF5v9iyqoK
-SUMSUB_API_URL=https://api.sumsub.com
-
-# .env.docker - Docker 生产
-DATABASE_URL=postgresql://kyc_user:kyc_password@db:5432/kyc_db
-```
-
-## 🐛 调试
-
-### 查看日志
-```bash
-# Docker 日志
-docker-compose logs -f web
-
-# 应用日志
-docker-compose exec web tail -f app.log
-
-# 数据库日志
-docker-compose logs -f db
-```
-
-### 进入容器
-```bash
-docker-compose exec web bash
-python3 -c "from app import create_app; app = create_app(); print('Connected!')"
-```
-
-### 数据库操作
-```bash
-# 进入 PostgreSQL
-docker-compose exec db psql -U kyc_user -d kyc_db
-
-# 查看表
-\dt
-
-# 查询订单
-SELECT * FROM orders;
-```
-
-## 📦 文件结构
-
-```
-app/
-├── models/
-│   ├── order.py              # 订单模型
-│   ├── verification.py       # 验证模型
-│   └── report.py             # 报告模型
-├── routes/
-│   ├── webhook.py            # Webhook 端点
-│   ├── verification.py       # 验证页面
-│   └── report.py             # 报告页面
-├── services/
-│   ├── sumsub_service.py    # ✅ Sumsub API 集成
-│   └── report_service.py    # PDF 生成
-└── utils/
-    └── token_generator.py    # Token 生成
-
-.env                           # ✅ 本地凭证
-.env.docker                    # ✅ Docker 凭证
-requirements.txt              # ✅ 已添加 sumsub-sdk
-tests/
-├── test_sumsub_integration.py    # ✅ Sumsub 测试
-└── test_full_integration.py      # ✅ 完整测试
-```
-
-## ✨ 系统特性
-
-- ✅ 接收淘宝/闲鱼 Webhook
-- ✅ 自动创建 Sumsub 验证
-- ✅ Web SDK 集成验证
-- ✅ 自动生成 PDF 报告
-- ✅ HMAC-SHA256 Webhook 签名验证
-- ✅ PostgreSQL 数据持久化
-- ✅ Docker 容器化
-- ✅ Nginx 反向代理
-- ✅ 生产就绪
-
-## 🎯 下一步
-
-1. **启动应用**
-   ```bash
-   ./quick-start.sh
-   ```
-
-2. **测试 Webhook**
-   ```bash
-   curl -X POST http://localhost:5000/webhook/taobao/order \
-     -H "Content-Type: application/json" \
-     -d '{"order_id":"test","buyer_name":"Test","buyer_email":"test@test.com","buyer_phone":"13800138000","order_amount":99.99}'
-   ```
-
-3. **访问验证页面**
-   - 从返回的响应中获取 `verification_token`
-   - 访问 `http://localhost:5000/verify/<verification_token>`
-
-4. **配置生产环境**
-   - 部署到 VPS: `./deploy-vps.sh <ip>`
-   - 配置淘宝/闲鱼 Webhook URL
-   - 设置 SSL 证书
-
-## 📞 支持
-
-系统已完全集成，如有问题:
-1. 检查 `.env` 文件中的凭证
-2. 查看 Docker 日志: `docker-compose logs -f`
-3. 运行测试: `python3 tests/test_full_integration.py`
+**✅ 正确做法**: 使用 Sumsub 官方提供的方案
+1. **后端**: 用 `requests` 库调用 Sumsub REST API
+2. **前端**: 在 HTML 中嵌入 Sumsub JavaScript WebSDK CDN
 
 ---
 
-**系统状态**: ✅ 就绪  
-**Sumsub 集成**: ✅ 完成  
-**API 认证**: ✅ HMAC-SHA256  
-**最后更新**: 2025-11-25
+## 架构图
+
+```
+┌─ 用户浏览器 ─────────────────────────┐
+│                                      │
+│  1. 访问验证链接                     │
+│  /verify/<token>                     │
+│        │                             │
+│        ▼                             │
+│  2. 获取验证页面 (HTML + JS)        │
+│  (包含 Sumsub 访问令牌)             │
+│        │                             │
+│        ▼                             │
+│  3. 加载 Sumsub WebSDK              │
+│  <script src="...snsWebSdk.js">     │
+│        │                             │
+│        ▼                             │
+│  4. 初始化 SDK                       │
+│  snsWebSdk.init(accessToken)        │
+│        │                             │
+│        ▼                             │
+│  5. 用户上传文件和脸部照片          │
+│        │                             │
+│        └───────────► Sumsub 服务器   │
+│         (HTTPS 直连)                 │
+│                                      │
+└──────────────────────────────────────┘
+
+┌─ 您的服务器 ──────────────────────────┐
+│                                        │
+│ Flask 路由:                           │
+│  - /verify/<token>                    │
+│  - /api/verification/refresh-token    │
+│  - /webhook/sumsub                    │
+│                                        │
+│ Sumsub 服务:                          │
+│  - create_verification()              │
+│  - _generate_access_token()           │
+│  - update_verification_status()       │
+│  - generate_pdf_report()              │
+│                                        │
+└──────────────────────────────────────┘
+         ▲                      ▼
+         │         REST API   │
+         │       (HMAC签名)    │
+         └──────────────────────┘
+```
+
+---
+
+## ✅ 已完成的工作
+
+### 1. 后端 API 集成 (Python)
+文件: `app/services/sumsub_service.py`
+
+```python
+# 函数列表
+✅ create_verification(order)           # 创建验证
+✅ _generate_access_token(applicant_id) # 生成 WebSDK 令牌
+✅ _get_signature(method, path, body)   # HMAC-SHA256 签名
+✅ update_verification_status(...)      # 更新状态
+✅ get_verification_result(...)         # 获取结果
+✅ generate_pdf_report(order_id)        # 生成报告
+```
+
+**特点**:
+- ✅ 使用 `requests` 库（无需 pip sumsub）
+- ✅ 完整的 HMAC-SHA256 签名认证
+- ✅ 错误处理和日志
+- ✅ 异常管理
+
+### 2. 前端 WebSDK 集成 (JavaScript)
+文件: `app/templates/verification.html`
+
+```html
+<script src="https://cdn.sumsub.com/idensic/js/11.17.0/snsWebSdk.js"></script>
+
+<script>
+const snsWebSdkInstance = snsWebSdk
+    .init(accessToken, refreshTokenCallback)
+    .withConf({ lang: "en", theme: "light" })
+    .on("idCheck.onStepCompleted", handleStep)
+    .on("idCheck.onComplete", handleComplete)
+    .on("idCheck.onError", handleError)
+    .build();
+
+snsWebSdkInstance.launch("#sumsub-websdk-container");
+</script>
+```
+
+**特点**:
+- ✅ 官方 CDN 加载
+- ✅ 访问令牌初始化
+- ✅ 事件监听 (完成/错误)
+- ✅ 自动令牌刷新
+- ✅ 响应式设计
+
+### 3. 环境变量配置
+文件: `.env`
+
+```bash
+SUMSUB_APP_TOKEN=your_app_token
+SUMSUB_SECRET_KEY=your_secret_key
+SUMSUB_API_URL=https://api.sumsub.com
+SUMSUB_WEBHOOK_SECRET=your_webhook_secret
+APP_DOMAIN=https://kyc.317073.xyz
+```
+
+### 4. 数据库模型
+文件: `app/models/verification.py`
+
+```python
+class Verification(db.Model):
+    id                    # UUID
+    order_id              # FK to Order
+    sumsub_applicant_id   # Sumsub 申请人 ID
+    verification_token    # 我们的验证令牌
+    access_token          # Sumsub WebSDK 访问令牌 ← 新增
+    status               # pending/approved/rejected
+    created_at           # 时间戳
+    completed_at         # 完成时间
+
+class Report(db.Model):
+    id
+    verification_id       # FK to Verification
+    verification_result   # approved/rejected
+    verification_details  # JSON 数据
+    pdf_path             # PDF 文件路径
+    created_at
+```
+
+---
+
+## 完整流程
+
+### 1️⃣ 后端生成访问令牌
+
+```python
+# app/routes/verification.py
+
+@verification_bp.route('/<token>')
+def show_verification(token):
+    # 查找验证记录
+    verification = Verification.query.filter_by(
+        verification_token=token
+    ).first()
+    
+    # 获取或生成访问令牌
+    if not verification.access_token:
+        access_token = sumsub_service._generate_access_token(
+            verification.sumsub_applicant_id
+        )
+        verification.access_token = access_token
+        db.session.commit()
+    
+    # 传递给前端
+    return render_template(
+        'verification.html',
+        verification_token=verification.access_token
+    )
+```
+
+### 2️⃣ 前端加载 WebSDK
+
+```javascript
+// HTML 页面加载时
+document.addEventListener('DOMContentLoaded', () => {
+    snsWebSdk.init(
+        "{{ verification_token }}",  // ← 从后端获取
+        refreshAccessToken           // ← 令牌过期时调用
+    )
+    .build()
+    .launch("#sumsub-websdk-container");
+});
+```
+
+### 3️⃣ 用户完成验证
+
+- 用户上传证件
+- 进行人脸识别
+- 活体检测
+- Sumsub 返回结果
+
+### 4️⃣ Sumsub 发送 Webhook
+
+```json
+POST /webhook/sumsub
+
+{
+    "applicantId": "abc123",
+    "reviewStatus": "approved"
+}
+```
+
+### 5️⃣ 后端处理 Webhook
+
+```python
+@app.route('/webhook/sumsub', methods=['POST'])
+def sumsub_webhook():
+    # 验证签名
+    verify_webhook_signature(request)
+    
+    # 更新验证状态
+    applicant_id = request.json['applicantId']
+    status = request.json['reviewStatus']
+    
+    sumsub_service.update_verification_status(
+        applicant_id, status
+    )
+    
+    # 如果通过，生成报告
+    if status == 'approved':
+        sumsub_service.generate_pdf_report(order_id)
+    
+    return {'success': True}
+```
+
+---
+
+## Flask 路由完整实现
+
+```python
+# app/routes/verification.py
+
+from flask import Blueprint, render_template, request, jsonify
+from app.services import sumsub_service
+from app.models import Order, Verification
+from app import db
+
+verification_bp = Blueprint('verification', __name__, url_prefix='/verify')
+
+@verification_bp.route('/<token>')
+def show_verification(token):
+    """显示 Sumsub WebSDK 验证页面"""
+    verification = Verification.query.filter_by(
+        verification_token=token
+    ).first()
+    
+    if not verification:
+        return "验证链接无效", 404
+    
+    order = Order.query.get(verification.order_id)
+    
+    return render_template(
+        'verification.html',
+        order=order,
+        verification_token=verification.access_token
+    )
+
+@verification_bp.route('/api/refresh-token', methods=['POST'])
+def refresh_token():
+    """刷新过期的访问令牌"""
+    data = request.json
+    order_id = data.get('order_id')
+    
+    verification = Verification.query.filter_by(
+        order_id=order_id
+    ).first()
+    
+    if not verification:
+        return {'error': 'Not found'}, 404
+    
+    try:
+        # 重新生成访问令牌
+        new_token = sumsub_service._generate_access_token(
+            verification.sumsub_applicant_id
+        )
+        
+        verification.access_token = new_token
+        db.session.commit()
+        
+        return {'access_token': new_token}
+    except Exception as e:
+        return {'error': str(e)}, 500
+```
+
+---
+
+## Webhook 处理
+
+```python
+# app/routes/webhook.py
+
+import hmac
+import hashlib
+
+@app.route('/webhook/sumsub', methods=['POST'])
+def sumsub_webhook():
+    """处理 Sumsub 验证结果 Webhook"""
+    
+    # 验证签名
+    webhook_secret = os.getenv('SUMSUB_WEBHOOK_SECRET')
+    x_signature = request.headers.get('X-Signature')
+    body = request.get_data()
+    
+    expected_sig = hmac.new(
+        webhook_secret.encode(),
+        body,
+        hashlib.sha256
+    ).hexdigest()
+    
+    if x_signature != expected_sig:
+        return {'error': 'Invalid signature'}, 403
+    
+    try:
+        data = request.json
+        applicant_id = data.get('applicantId')
+        status = data.get('reviewStatus')
+        
+        # 更新验证状态
+        verification = Verification.query.filter_by(
+            sumsub_applicant_id=applicant_id
+        ).first()
+        
+        if verification:
+            sumsub_service.update_verification_status(
+                applicant_id, status
+            )
+            
+            # 通过则生成报告
+            if status == 'approved':
+                sumsub_service.generate_pdf_report(
+                    verification.order_id
+                )
+        
+        return {'success': True}
+    except Exception as e:
+        print(f"Webhook error: {e}")
+        return {'error': str(e)}, 500
+```
+
+---
+
+## 测试检查清单
+
+```bash
+# 1. 检查环境变量
+echo $SUMSUB_APP_TOKEN
+echo $SUMSUB_SECRET_KEY
+
+# 2. 启动应用
+docker-compose up -d
+
+# 3. 测试后端 API
+curl -X POST http://localhost:5000/api/test-sumsub \
+  -H "Content-Type: application/json" \
+  -d '{"buyer_email": "test@test.com"}'
+
+# 4. 访问验证页面
+# 从返回的响应获取 verification_token
+# 访问 http://localhost:5000/verify/<token>
+
+# 5. 检查 WebSDK 是否加载
+# 在浏览器开发者工具中查看网络请求
+# 应该看到 snsWebSdk.js 加载成功
+
+# 6. 查看日志
+docker-compose logs -f web
+```
+
+---
+
+## 常见问题
+
+### Q: WebSDK 不加载怎么办？
+**A**: 检查浏览器控制台是否有 CORS 错误。Sumsub CDN 可能被 GFW 阻止（中国）。
+
+**解决**: 使用代理或更新 CDN 地址。
+
+### Q: 访问令牌过期了怎么办？
+**A**: 前端自动调用 `/verify/api/refresh-token` 获取新令牌。
+
+### Q: 如何验证 Webhook 的真伪？
+**A**: 检查 `X-Signature` 头：
+
+```python
+expected = hmac.new(secret.encode(), body, sha256).hexdigest()
+if received_sig != expected:
+    return 403  # 非法请求
+```
+
+### Q: 生产环境用哪个 Sumsub 端点？
+**A**: 使用 `https://api.sumsub.com`（生产）
+
+开发: `https://test-api.sumsub.com`
+
+---
+
+## 所需的 Python 依赖
+
+```
+requests>=2.28.0          # HTTP 客户端（用于 API）
+python-dotenv>=0.20.0    # 环境变量
+Flask>=2.3.0
+Flask-SQLAlchemy>=3.0.0
+reportlab>=3.6.0         # PDF 生成
+```
+
+**无需安装 `sumsub` 包！**
+
+---
+
+## 文件清单
+
+- ✅ `app/services/sumsub_service.py` - 后端 API 客户端
+- ✅ `app/templates/verification.html` - 前端 WebSDK
+- ✅ `app/routes/verification.py` - 验证路由
+- ✅ `app/routes/webhook.py` - Webhook 处理
+- ✅ `app/models/verification.py` - 数据库模型
+- ✅ `.env` - 环境变量
+- ✅ `requirements.txt` - Python 依赖
+
+---
+
+**系统状态**: ✅ 完全就绪  
+**集成方式**: ✅ JavaScript WebSDK + Python REST API  
+**认证方式**: ✅ HMAC-SHA256  
+**前端**: ✅ CDN 加载，无需本地构建  
+**后端**: ✅ 无需 pip sumsub 包  
+
