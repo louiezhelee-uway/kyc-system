@@ -18,6 +18,9 @@ def _get_signature(method: str, path: str, body: str = ''):
     """
     Generate HMAC-SHA256 signature for Sumsub API requests
     """
+    if not SUMSUB_SECRET_KEY:
+        raise Exception('SUMSUB_SECRET_KEY is not configured')
+    
     ts = str(int(time.time()))
     request_body = body if body else ''
     signature_raw = f"{method}{path}{request_body}{ts}"

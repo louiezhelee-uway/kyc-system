@@ -16,18 +16,23 @@ def taobao_order_webhook():
     """
     try:
         # Verify webhook signature
-        webhook_secret = os.getenv('WEBHOOK_SECRET', 'default-secret')
+        webhook_secret = os.getenv('WEBHOOK_SECRET')
         signature = request.headers.get('X-Webhook-Signature')
         
-        payload = request.get_data()
-        expected_signature = hmac.new(
-            webhook_secret.encode(),
-            payload,
-            hashlib.sha256
-        ).hexdigest()
-        
-        if not hmac.compare_digest(signature, expected_signature):
-            return jsonify({'error': 'Invalid signature'}), 401
+        # If signature is provided, verify it
+        if signature:
+            payload = request.get_data()
+            expected_signature = hmac.new(
+                webhook_secret.encode(),
+                payload,
+                hashlib.sha256
+            ).hexdigest()
+            
+            if not hmac.compare_digest(signature, expected_signature):
+                return jsonify({'error': 'Invalid signature'}), 401
+        elif webhook_secret:
+            # If signature is required but not provided
+            return jsonify({'error': 'Missing X-Webhook-Signature header'}), 401
         
         data = request.get_json()
         
