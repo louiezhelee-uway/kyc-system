@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # PostgreSQL 数据库
   postgres:
     image: postgres:15-alpine
     container_name: kyc_postgres
@@ -23,10 +24,12 @@ services:
       - kyc_network
     restart: unless-stopped
 
+  # Flask 应用
   web:
     build:
       context: .
       dockerfile: Dockerfile
+    image: kyc-app:latest
     container_name: kyc_web
     ports:
       - "5000:5000"
@@ -39,6 +42,7 @@ services:
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:-your-webhook-secret}
       SECRET_KEY: ${SECRET_KEY:-your-secret-key}
       PYTHONUNBUFFERED: 1
+      DEBIAN_FRONTEND: noninteractive
     depends_on:
       postgres:
         condition: service_healthy
@@ -50,6 +54,7 @@ services:
     restart: unless-stopped
     command: ["sh", "-c", "sleep 5 && python run.py"]
 
+  # Nginx 反向代理
   nginx:
     image: nginx:alpine
     container_name: kyc_nginx
