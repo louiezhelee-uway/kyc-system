@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 import os
@@ -20,6 +20,16 @@ def create_app():
     # Initialize extensions
     db.init_app(app)
     migrate.init_app(app, db)
+    
+    # Health check endpoint
+    @app.route('/health')
+    def health_check():
+        """健康检查端点"""
+        return jsonify({
+            'status': 'healthy',
+            'service': 'KYC Verification System',
+            'version': '1.0.0'
+        }), 200
     
     # Register blueprints
     from app.routes import webhook, verification, report
