@@ -7,7 +7,24 @@
 echo "运行 Flask 应用内部测试..."
 echo ""
 
-docker exec kyc_web python3 << 'EOF'
+# 首先检查容器状态
+echo "检查 Docker 容器..."
+docker ps -a | grep kyc
+
+# 尝试使用容器名而不是服务名
+CONTAINER_NAME=$(docker ps --format '{{.Names}}' | grep kyc_web || docker ps -a --format '{{.Names}}' | grep kyc_web || echo "")
+
+if [ -z "$CONTAINER_NAME" ]; then
+    echo "❌ 找不到 kyc_web 容器"
+    echo "可用的容器:"
+    docker ps -a
+    exit 1
+fi
+
+echo "✅ 找到容器: $CONTAINER_NAME"
+echo ""
+
+docker exec "$CONTAINER_NAME" python3 << 'EOF'
 import sys
 import os
 
