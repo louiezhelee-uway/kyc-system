@@ -15,12 +15,13 @@ def taobao_order_webhook():
     Triggered when a buyer purchases an item
     """
     try:
-        # Verify webhook signature
+        # Verify webhook signature (optional in development/test mode)
         webhook_secret = os.getenv('WEBHOOK_SECRET')
+        flask_env = os.getenv('FLASK_ENV', 'production')
         signature = request.headers.get('X-Webhook-Signature')
         
-        # If signature is provided, verify it
-        if signature:
+        # If signature is provided, always verify it
+        if signature and webhook_secret:
             payload = request.get_data()
             expected_signature = hmac.new(
                 webhook_secret.encode(),
@@ -30,8 +31,8 @@ def taobao_order_webhook():
             
             if not hmac.compare_digest(signature, expected_signature):
                 return jsonify({'error': 'Invalid signature'}), 401
-        elif webhook_secret:
-            # If signature is required but not provided
+        # In production, require signature; in dev/test, allow without it
+        elif not signature and webhook_secret and flask_env == 'production':
             return jsonify({'error': 'Missing X-Webhook-Signature header'}), 401
         
         data = request.get_json()
