@@ -73,76 +73,23 @@ def _get_request_headers(ts: str, signature: str) -> dict:
 def create_verification(order: Order) -> Verification:
     """
     Create a new verification with Sumsub API
+    
+    Note: Sumsub SDK flow doesn't require creating applicant separately.
+    Applicants are created automatically when generating access tokens.
     """
     try:
-        # Generate unique applicant ID
-        external_user_id = f"order_{order.id}"
+        # Generate unique user ID
+        user_id = f"order_{order.id}"
         
-        # Prepare applicant data
-        payload = {
-            'externalUserId': external_user_id,
-            'email': order.buyer_email,
-            'phone': order.buyer_phone,
-            'firstName': order.buyer_name,
-            'lastName': '',
-            'country': 'CN',
-            'levelName': os.getenv('SUMSUB_VERIFICATION_LEVEL', 'id-and-liveness'),
-        }
-        
-        # Create applicant in Sumsub
-        path = '/resources/applicants'
-        import json
-        body = json.dumps(payload)
-        ts, signature = _get_signature('POST', path, body)
-        
-        headers = _get_request_headers(ts, signature)
-        
-        url = f'{SUMSUB_API_URL}{path}'
-        
-        # Use session with retry strategy
-        session = _get_session()
-        response = session.post(
-            url,
-            json=payload,
-            headers=headers,
-            timeout=15,
-            allow_redirects=False
-        )
-        session.close()
-        
-        # Detailed error diagnostics
-        if response.status_code not in [200, 201]:
-            error_msg = f'Sumsub API error - Status: {response.status_code}'
-            
-            # Check response content
-            try:
-                error_data = response.json()
-                error_msg += f'\nAPI Error: {error_data.get("description", error_data)}'
-            except:
-                error_msg += f'\nResponse: {response.text[:300]}'
-            
-            raise Exception(error_msg)
-        
-        sumsub_applicant = response.json()
-        sumsub_applicant_id = sumsub_applicant.get('id')
-        
-        if not sumsub_applicant_id:
-            raise Exception('Failed to get applicant ID from Sumsub response')
-        
-        # Generate access token for web SDK
-        access_token = _generate_access_token(sumsub_applicant_id, external_user_id)
-        
-        # Create verification link
+        # Create verification token (will be used in URL)
         verification_token = token_generator.generate_verification_token()
         
-        # Web SDK verification link
-        verification_link = f"{SUMSUB_API_URL.replace('/api', '')}/sdk/applicant?token={access_token}"
-        
         # Create verification record
+        # Note: verification_link is backend URL, actual link is generated dynamically
         verification = Verification(
             order_id=order.id,
-            sumsub_applicant_id=sumsub_applicant_id,
-            verification_link=verification_link,
+            sumsub_applicant_id=user_id,  # Use user_id as applicant identifier
+            verification_link=f"/verify/{verification_token}",  # Backend URL
             verification_token=verification_token,
             status='pending'
         )
@@ -155,7 +102,7 @@ def create_verification(order: Order) -> Verification:
     except Exception as e:
         raise Exception(f'Failed to create verification: {str(e)}')
 
-def _generate_access_token(applicant_id: str, user_id: str) -> str:
+def _generate_access_token(applicant_id: str, user_id: str, email: str = None) -> str:
     """
     Generate access token for Sumsub Web SDK
     Uses the dedicated endpoint per official documentation
@@ -168,10 +115,13 @@ def _generate_access_token(applicant_id: str, user_id: str) -> str:
             'userId': user_id,
             'levelName': os.getenv('SUMSUB_VERIFICATION_LEVEL', 'id-and-liveness'),
             'ttlInSecs': 1800,
-            'applicantIdentifiers': {
-                'email': 'test@kyc.317073.xyz'
-            }
         }
+        
+        # Add email if provided
+        if email:
+            payload['applicantIdentifiers'] = {
+                'email': email
+            }
         
         import json
         body = json.dumps(payload)

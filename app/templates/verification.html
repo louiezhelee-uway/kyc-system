@@ -3,36 +3,281 @@
 {% block title %}KYC 验证 - 订单 {{ order.taobao_order_id }}{% endblock %}
 
 {% block content %}
-<h1>身份验证</h1>
-
-<div class="info-box">
-    <p><strong>订单号:</strong> {{ order.taobao_order_id }}</p>
-    <p><strong>买家:</strong> {{ order.buyer_name }}</p>
-    <p><strong>邮箱:</strong> {{ order.buyer_email }}</p>
-</div>
-
-<p>为了完成您的订单，我们需要进行身份验证。请点击下方按钮进行身份验证。</p>
-
-<p>验证过程通常需要 5-10 分钟，请准备好您的身份证件。</p>
-
-<center>
-    <a href="{{ verification_link }}" class="button">开始验证</a>
-</center>
-
-<p style="margin-top: 30px; font-size: 12px; color: #999; text-align: center;">
-    验证由独立第三方 Sumsub 提供。您的个人信息将被安全加密处理。
-</p>
-
-<div class="footer">
-    <p>如您有任何问题，请联系我们的客户服务团队。</p>
-</div>
-{% endblock %}
-
-{% block extra_css %}
 <style>
-    center {
+    .verification-container {
+        max-width: 900px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+    }
+
+    .verification-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 40px 30px;
+        text-align: center;
+    }
+
+    .verification-header h1 {
+        font-size: 28px;
+        margin-bottom: 10px;
+    }
+
+    .verification-header p {
+        font-size: 14px;
+        opacity: 0.9;
+    }
+
+    .verification-content {
+        padding: 40px 30px;
+    }
+
+    .order-info {
+        background: #f9f9f9;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 30px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+    }
+
+    .order-info-item {
+        border-bottom: 1px solid #eee;
+        padding-bottom: 10px;
+    }
+
+    .order-info-item:last-child {
+        border-bottom: none;
+    }
+
+    .order-info-label {
+        font-size: 12px;
+        color: #666;
+        text-transform: uppercase;
+        font-weight: 600;
+        margin-bottom: 5px;
+    }
+
+    .order-info-value {
+        font-size: 16px;
+        color: #333;
+        font-weight: 500;
+    }
+
+    #sumsub-websdk-container {
+        min-height: 700px;
+        border: 1px solid #eee;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #fafafa;
+        position: relative;
+    }
+
+    .sdk-loading {
         display: flex;
+        align-items: center;
         justify-content: center;
+        height: 100%;
+        gap: 15px;
+    }
+
+    .spinner {
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #667eea;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .error-message {
+        background: #fee;
+        color: #c33;
+        padding: 20px;
+        border-radius: 8px;
+        border-left: 4px solid #c33;
+        margin-top: 20px;
+    }
+
+    .verification-footer {
+        background: #f9f9f9;
+        padding: 20px 30px;
+        border-top: 1px solid #eee;
+        text-align: center;
+        color: #666;
+        font-size: 12px;
+    }
+
+    @media (max-width: 768px) {
+        .verification-header {
+            padding: 30px 20px;
+        }
+
+        .verification-header h1 {
+            font-size: 22px;
+        }
+
+        .verification-content {
+            padding: 20px;
+        }
+
+        #sumsub-websdk-container {
+            min-height: 600px;
+        }
     }
 </style>
+
+<div class="verification-container">
+    <div class="verification-header">
+        <h1>💼 KYC 身份验证</h1>
+        <p>请完成身份验证以继续处理您的订单</p>
+    </div>
+
+    <div class="verification-content">
+        <!-- 订单信息 -->
+        <div class="order-info">
+            <div class="order-info-item">
+                <div class="order-info-label">订单号</div>
+                <div class="order-info-value">{{ order.taobao_order_id }}</div>
+            </div>
+            <div class="order-info-item">
+                <div class="order-info-label">买家名称</div>
+                <div class="order-info-value">{{ order.buyer_name }}</div>
+            </div>
+            <div class="order-info-item">
+                <div class="order-info-label">邮箱</div>
+                <div class="order-info-value">{{ order.buyer_email }}</div>
+            </div>
+        </div>
+
+        <!-- Sumsub WebSDK 容器 -->
+        <div id="sumsub-websdk-container">
+            <div class="sdk-loading">
+                <div class="spinner"></div>
+                <span>正在加载验证页面...</span>
+            </div>
+        </div>
+
+        <div id="error-container"></div>
+    </div>
+
+    <div class="verification-footer">
+        <p>✓ 验证过程通常需要 5-10 分钟 | ✓ 数据通过加密连接安全传输 | ✓ 由 Sumsub 提供支持</p>
+    </div>
+</div>
+
+<!-- Sumsub WebSDK Script -->
+<script src="https://static.sumsub.com/idensic/static/sns-websdk-builder.js"></script>
+
+<script>
+    const accessToken = "{{ verification_token_for_sdk }}";
+    const verificationToken = "{{ verification_token }}";
+
+    function initializeSDK() {
+        if (!accessToken) {
+            showError('无法获取验证令牌。请稍后重试或联系客服。');
+            return;
+        }
+
+        try {
+            let snsWebSdkInstance = snsWebSdk
+                .init(accessToken, () => getNewAccessToken())
+                .withConf({
+                    lang: "zh",
+                    theme: "light"
+                })
+                .withOptions({ 
+                    addViewportTag: true, 
+                    adaptIframeHeight: true 
+                })
+                .on("idCheck.onStepCompleted", (payload) => {
+                    console.log("验证步骤完成", payload);
+                })
+                .on("idCheck.onError", (error) => {
+                    console.error("验证错误", error);
+                    showError(`验证过程出错: ${error.message}`);
+                })
+                .on("idCheck.onApplicantSubmitted", (applicantId) => {
+                    console.log("申请提交成功", applicantId);
+                    // 可选：显示提交成功消息
+                    showSuccess('您的信息已提交，正在处理中...');
+                })
+                .onMessage((type, payload) => {
+                    console.log("验证事件", type, payload);
+                })
+                .build();
+
+            snsWebSdkInstance.launch("#sumsub-websdk-container");
+
+        } catch (error) {
+            console.error("初始化失败:", error);
+            showError(`初始化失败: ${error.message}`);
+        }
+    }
+
+    function getNewAccessToken() {
+        // 当令牌过期时，从后端获取新令牌
+        console.log("令牌即将过期，正在刷新...");
+        
+        return fetch('/verify/refresh-token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                verification_token: verificationToken
+            })
+        })
+        .then(res => {
+            if (!res.ok) {
+                throw new Error(`Token refresh failed: ${res.status}`);
+            }
+            return res.json();
+        })
+        .then(data => {
+            console.log("已刷新新令牌");
+            return data.token;
+        })
+        .catch(error => {
+            console.error("令牌刷新失败:", error);
+            showError(`令牌刷新失败: ${error.message}`);
+            throw error;
+        });
+    }
+
+    function showError(message) {
+        const errorContainer = document.getElementById('error-container');
+        errorContainer.innerHTML = `<div class="error-message"><strong>❌ 错误:</strong> ${message}</div>`;
+    }
+
+    function showSuccess(message) {
+        const errorContainer = document.getElementById('error-container');
+        errorContainer.innerHTML = `<div class="success-message"><strong>✓ 成功:</strong> ${message}</div>`;
+    }
+
+    // 页面加载时初始化
+    document.addEventListener('DOMContentLoaded', initializeSDK);
+</script>
+
+<style>
+    .success-message {
+        background: #efe;
+        color: #3c3;
+        padding: 20px;
+        border-radius: 8px;
+        border-left: 4px solid #3c3;
+        margin-top: 20px;
+    }
+</style>
+
+
 {% endblock %}
+
