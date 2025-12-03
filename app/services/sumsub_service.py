@@ -8,11 +8,33 @@ from datetime import datetime
 from app import db
 from app.models import Order, Verification
 from app.utils import token_generator
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 # Sumsub SDK Configuration
 SUMSUB_APP_TOKEN = os.getenv('SUMSUB_APP_TOKEN')
 SUMSUB_SECRET_KEY = os.getenv('SUMSUB_SECRET_KEY')
 SUMSUB_API_URL = os.getenv('SUMSUB_API_URL', 'https://api.sumsub.com')
+
+def _get_session():
+    """
+    Create a requests session with retry strategy and proper headers
+    """
+    session = requests.Session()
+    
+    # Configure retry strategy
+    retry_strategy = Retry(
+        total=3,
+        backoff_factor=1,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["HEAD", "GET", "OPTIONS", "POST", "PUT"]
+    )
+    
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    
+    return session
 
 def _get_signature(method: str, path: str, body: str = ''):
     """
@@ -36,7 +58,7 @@ def _get_signature(method: str, path: str, body: str = ''):
 
 def _get_request_headers(ts: str, signature: str) -> dict:
     """
-    Build request headers for Sumsub API
+    Build request headers for Sumsub API with Cloudflare bypass
     """
     return {
         'Authorization': f'Bearer {SUMSUB_APP_TOKEN}',
@@ -44,7 +66,17 @@ def _get_request_headers(ts: str, signature: str) -> dict:
         'X-App-Access-Ts': ts,
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'User-Agent': 'KYC-System/1.0',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+        'Sec-Ch-Ua-Mobile': '?0',
+        'Sec-Ch-Ua-Platform': '"Windows"',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'same-site',
     }
 
 def create_verification(order: Order) -> Verification:
@@ -75,13 +107,16 @@ def create_verification(order: Order) -> Verification:
         
         url = f'{SUMSUB_API_URL}{path}'
         
-        response = requests.post(
+        # Use session with retry strategy
+        session = _get_session()
+        response = session.post(
             url,
             json=payload,
             headers=headers,
-            timeout=10,
+            timeout=15,
             allow_redirects=False
         )
+        session.close()
         
         # Detailed error diagnostics
         if response.status_code not in [200, 201]:
@@ -91,6 +126,7 @@ def create_verification(order: Order) -> Verification:
             if 'cf-mitigated' in response.headers:
                 error_msg += f'\n⚠️ Cloudflare challenge detected: {response.headers.get("cf-mitigated")}'
                 error_msg += f'\nServer: {response.headers.get("Server")}'
+                error_msg += f'\nCF-Ray: {response.headers.get("cf-ray")}'
             
             # Check response content
             try:
@@ -148,13 +184,15 @@ def _generate_access_token(applicant_id: str) -> str:
             'redirectUrl': os.getenv('APP_DOMAIN', 'http://localhost:5000') + '/verification/complete'
         }
         
-        response = requests.post(
+        session = _get_session()
+        response = session.post(
             f'{SUMSUB_API_URL}{path}',
             json=payload,
             headers=headers,
-            timeout=10,
+            timeout=15,
             allow_redirects=False
         )
+        session.close()
         
         if response.status_code not in [200, 201]:
             raise Exception(f'Token generation failed: {response.text}')
@@ -203,12 +241,14 @@ def get_verification_result(sumsub_applicant_id: str) -> dict:
         ts, signature = _get_signature('GET', path)
         headers = _get_request_headers(ts, signature)
         
-        response = requests.get(
+        session = _get_session()
+        response = session.get(
             f'{SUMSUB_API_URL}{path}',
             headers=headers,
-            timeout=10,
+            timeout=15,
             allow_redirects=False
         )
+        session.close()
         
         if response.status_code != 200:
             raise Exception(f'Failed to get review: {response.text}')
