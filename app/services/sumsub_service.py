@@ -39,14 +39,15 @@ def _get_session():
 def _get_signature(method: str, path: str, body: str = ''):
     """
     Generate HMAC-SHA256 signature for Sumsub API requests
-    Format: {method}{path}{body}{timestamp}
+    Format per official docs: {timestamp}{method}{path}{body}
+    Timestamp should be in seconds (Unix Epoch), not milliseconds
     """
     if not SUMSUB_SECRET_KEY:
         raise Exception('SUMSUB_SECRET_KEY is not configured')
     
-    ts = str(int(time.time() * 1000))  # Milliseconds, not seconds
+    ts = str(int(time.time()))  # Seconds (Unix Epoch), not milliseconds
     request_body = body if body else ''
-    signature_raw = f"{method}{path}{request_body}{ts}"
+    signature_raw = f"{ts}{method}{path}{request_body}"
     
     signature = hmac.new(
         SUMSUB_SECRET_KEY.encode(),
@@ -58,25 +59,15 @@ def _get_signature(method: str, path: str, body: str = ''):
 
 def _get_request_headers(ts: str, signature: str) -> dict:
     """
-    Build request headers for Sumsub API with Cloudflare bypass
+    Build request headers for Sumsub API per official documentation
+    Uses X-App-Token instead of Bearer token
     """
     return {
-        'Authorization': f'Bearer {SUMSUB_APP_TOKEN}',
+        'X-App-Token': SUMSUB_APP_TOKEN,
         'X-App-Access-Sig': signature,
         'X-App-Access-Ts': ts,
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-        'Sec-Ch-Ua-Mobile': '?0',
-        'Sec-Ch-Ua-Platform': '"Windows"',
-        'Sec-Fetch-Dest': 'empty',
-        'Sec-Fetch-Mode': 'cors',
-        'Sec-Fetch-Site': 'same-site',
     }
 
 def create_verification(order: Order) -> Verification:
@@ -95,6 +86,7 @@ def create_verification(order: Order) -> Verification:
             'firstName': order.buyer_name,
             'lastName': '',
             'country': 'CN',
+            'levelName': os.getenv('SUMSUB_VERIFICATION_LEVEL', 'id-and-liveness'),
         }
         
         # Create applicant in Sumsub
@@ -122,16 +114,10 @@ def create_verification(order: Order) -> Verification:
         if response.status_code not in [200, 201]:
             error_msg = f'Sumsub API error - Status: {response.status_code}'
             
-            # Check if it's Cloudflare challenge
-            if 'cf-mitigated' in response.headers:
-                error_msg += f'\n⚠️ Cloudflare challenge detected: {response.headers.get("cf-mitigated")}'
-                error_msg += f'\nServer: {response.headers.get("Server")}'
-                error_msg += f'\nCF-Ray: {response.headers.get("cf-ray")}'
-            
             # Check response content
             try:
                 error_data = response.json()
-                error_msg += f'\nAPI Error: {error_data}'
+                error_msg += f'\nAPI Error: {error_data.get("description", error_data)}'
             except:
                 error_msg += f'\nResponse: {response.text[:300]}'
             
@@ -144,7 +130,7 @@ def create_verification(order: Order) -> Verification:
             raise Exception('Failed to get applicant ID from Sumsub response')
         
         # Generate access token for web SDK
-        access_token = _generate_access_token(sumsub_applicant_id)
+        access_token = _generate_access_token(sumsub_applicant_id, external_user_id)
         
         # Create verification link
         verification_token = token_generator.generate_verification_token()
@@ -169,20 +155,28 @@ def create_verification(order: Order) -> Verification:
     except Exception as e:
         raise Exception(f'Failed to create verification: {str(e)}')
 
-def _generate_access_token(applicant_id: str) -> str:
+def _generate_access_token(applicant_id: str, user_id: str) -> str:
     """
     Generate access token for Sumsub Web SDK
+    Uses the dedicated endpoint per official documentation
+    Endpoint: POST /resources/accessTokens/sdk
     """
     try:
-        path = f'/resources/applicants/{applicant_id}/tokens'
-        
-        ts, signature = _get_signature('POST', path, '')
-        headers = _get_request_headers(ts, signature)
+        path = '/resources/accessTokens/sdk'
         
         payload = {
+            'userId': user_id,
+            'levelName': os.getenv('SUMSUB_VERIFICATION_LEVEL', 'id-and-liveness'),
             'ttlInSecs': 1800,
-            'redirectUrl': os.getenv('APP_DOMAIN', 'http://localhost:5000') + '/verification/complete'
+            'applicantIdentifiers': {
+                'email': 'test@kyc.317073.xyz'
+            }
         }
+        
+        import json
+        body = json.dumps(payload)
+        ts, signature = _get_signature('POST', path, body)
+        headers = _get_request_headers(ts, signature)
         
         session = _get_session()
         response = session.post(
@@ -195,7 +189,13 @@ def _generate_access_token(applicant_id: str) -> str:
         session.close()
         
         if response.status_code not in [200, 201]:
-            raise Exception(f'Token generation failed: {response.text}')
+            error_msg = f'Token generation failed (Status: {response.status_code})'
+            try:
+                error_data = response.json()
+                error_msg += f': {error_data.get("description", error_data)}'
+            except:
+                error_msg += f'\nResponse: {response.text[:300]}'
+            raise Exception(error_msg)
         
         token_data = response.json()
         return token_data.get('token')

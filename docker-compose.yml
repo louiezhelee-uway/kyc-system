@@ -40,6 +40,7 @@ services:
       SUMSUB_APP_TOKEN: ${SUMSUB_APP_TOKEN:-your-app-token}
       SUMSUB_SECRET_KEY: ${SUMSUB_SECRET_KEY:-your-secret-key}
       SUMSUB_API_URL: https://api.sumsub.com
+      SUMSUB_VERIFICATION_LEVEL: ${SUMSUB_VERIFICATION_LEVEL:-id-and-liveness}
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:-your-webhook-secret}
       SECRET_KEY: ${SECRET_KEY:-your-secret-key}
       PYTHONUNBUFFERED: 1
