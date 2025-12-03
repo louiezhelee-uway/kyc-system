@@ -47,7 +47,7 @@ def taobao_order_webhook():
             buyer_id = data.get('buyer_name', data.get('order_id', 'unknown'))
         
         order_data = {
-            'taobao_order_id': data.get('order_id'),
+            'taobao_order_id': data.get('taobao_order_id') or data.get('order_id'),
             'buyer_id': buyer_id,
             'buyer_name': data.get('buyer_name'),
             'buyer_email': data.get('buyer_email'),
