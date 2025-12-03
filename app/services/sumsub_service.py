@@ -26,18 +26,26 @@ def _get_signature(method: str, path: str, body: str = ''):
     request_body = body if body else ''
     signature_raw = f"{method}{path}{request_body}{ts}"
     
-    print(f"🔐 签名原文: {signature_raw}")
-    
     signature = hmac.new(
         SUMSUB_SECRET_KEY.encode(),
         signature_raw.encode(),
         hashlib.sha256
     ).hexdigest()
     
-    print(f"🔐 签名结果: {signature}")
-    print(f"🔐 时间戳: {ts}")
-    
     return ts, signature
+
+def _get_request_headers(ts: str, signature: str) -> dict:
+    """
+    Build request headers for Sumsub API
+    """
+    return {
+        'Authorization': f'Bearer {SUMSUB_APP_TOKEN}',
+        'X-App-Access-Sig': signature,
+        'X-App-Access-Ts': ts,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'User-Agent': 'KYC-System/1.0',
+    }
 
 def create_verification(order: Order) -> Verification:
     """
@@ -63,28 +71,35 @@ def create_verification(order: Order) -> Verification:
         body = json.dumps(payload)
         ts, signature = _get_signature('POST', path, body)
         
-        headers = {
-            'Authorization': f'Bearer {SUMSUB_APP_TOKEN}',
-            'X-App-Access-Sig': signature,
-            'X-App-Access-Ts': ts,
-            'Content-Type': 'application/json'
-        }
+        headers = _get_request_headers(ts, signature)
         
-        print(f"📤 发送请求到: {SUMSUB_API_URL}{path}")
-        print(f"📤 请求头: Authorization=Bearer ******, X-App-Access-Sig={signature[:10]}..., X-App-Access-Ts={ts}")
+        url = f'{SUMSUB_API_URL}{path}'
         
         response = requests.post(
-            f'{SUMSUB_API_URL}{path}',
+            url,
             json=payload,
             headers=headers,
-            timeout=10
+            timeout=10,
+            allow_redirects=False
         )
         
-        print(f"📥 响应状态码: {response.status_code}")
-        print(f"📥 响应内容 (前 500 字): {response.text[:500]}")
-        
+        # Detailed error diagnostics
         if response.status_code not in [200, 201]:
-            raise Exception(f'Sumsub API error: {response.text}')
+            error_msg = f'Sumsub API error - Status: {response.status_code}'
+            
+            # Check if it's Cloudflare challenge
+            if 'cf-mitigated' in response.headers:
+                error_msg += f'\n⚠️ Cloudflare challenge detected: {response.headers.get("cf-mitigated")}'
+                error_msg += f'\nServer: {response.headers.get("Server")}'
+            
+            # Check response content
+            try:
+                error_data = response.json()
+                error_msg += f'\nAPI Error: {error_data}'
+            except:
+                error_msg += f'\nResponse: {response.text[:300]}'
+            
+            raise Exception(error_msg)
         
         sumsub_applicant = response.json()
         sumsub_applicant_id = sumsub_applicant.get('id')
@@ -126,13 +141,7 @@ def _generate_access_token(applicant_id: str) -> str:
         path = f'/resources/applicants/{applicant_id}/tokens'
         
         ts, signature = _get_signature('POST', path, '')
-        
-        headers = {
-            'Authorization': f'Bearer {SUMSUB_APP_TOKEN}',
-            'X-App-Access-Sig': signature,
-            'X-App-Access-Ts': ts,
-            'Content-Type': 'application/json'
-        }
+        headers = _get_request_headers(ts, signature)
         
         payload = {
             'ttlInSecs': 1800,
@@ -143,7 +152,8 @@ def _generate_access_token(applicant_id: str) -> str:
             f'{SUMSUB_API_URL}{path}',
             json=payload,
             headers=headers,
-            timeout=10
+            timeout=10,
+            allow_redirects=False
         )
         
         if response.status_code not in [200, 201]:
@@ -191,17 +201,13 @@ def get_verification_result(sumsub_applicant_id: str) -> dict:
     try:
         path = f'/resources/applicants/{sumsub_applicant_id}/review'
         ts, signature = _get_signature('GET', path)
-        
-        headers = {
-            'Authorization': f'Bearer {SUMSUB_APP_TOKEN}',
-            'X-App-Access-Sig': signature,
-            'X-App-Access-Ts': ts
-        }
+        headers = _get_request_headers(ts, signature)
         
         response = requests.get(
             f'{SUMSUB_API_URL}{path}',
             headers=headers,
-            timeout=10
+            timeout=10,
+            allow_redirects=False
         )
         
         if response.status_code != 200:
