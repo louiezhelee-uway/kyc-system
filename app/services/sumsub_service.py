@@ -17,18 +17,26 @@ SUMSUB_API_URL = os.getenv('SUMSUB_API_URL', 'https://api.sumsub.com')
 def _get_signature(method: str, path: str, body: str = ''):
     """
     Generate HMAC-SHA256 signature for Sumsub API requests
+    Format: {method}{path}{body}{timestamp}
     """
     if not SUMSUB_SECRET_KEY:
         raise Exception('SUMSUB_SECRET_KEY is not configured')
     
-    ts = str(int(time.time()))
+    ts = str(int(time.time() * 1000))  # Milliseconds, not seconds
     request_body = body if body else ''
     signature_raw = f"{method}{path}{request_body}{ts}"
+    
+    print(f"🔐 签名原文: {signature_raw}")
+    
     signature = hmac.new(
         SUMSUB_SECRET_KEY.encode(),
         signature_raw.encode(),
         hashlib.sha256
     ).hexdigest()
+    
+    print(f"🔐 签名结果: {signature}")
+    print(f"🔐 时间戳: {ts}")
+    
     return ts, signature
 
 def create_verification(order: Order) -> Verification:
@@ -62,12 +70,18 @@ def create_verification(order: Order) -> Verification:
             'Content-Type': 'application/json'
         }
         
+        print(f"📤 发送请求到: {SUMSUB_API_URL}{path}")
+        print(f"📤 请求头: Authorization=Bearer ******, X-App-Access-Sig={signature[:10]}..., X-App-Access-Ts={ts}")
+        
         response = requests.post(
             f'{SUMSUB_API_URL}{path}',
             json=payload,
             headers=headers,
             timeout=10
         )
+        
+        print(f"📥 响应状态码: {response.status_code}")
+        print(f"📥 响应内容 (前 500 字): {response.text[:500]}")
         
         if response.status_code not in [200, 201]:
             raise Exception(f'Sumsub API error: {response.text}')
