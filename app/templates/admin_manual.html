@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KYC 管理后台 - 生成验证链接</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            color: #333;
+        }
+        
+        .logout-btn {
+            padding: 10px 20px;
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+        
+        .logout-btn:hover {
+            background: #ff5252;
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .card h2 {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .form-group {
+            margin-bottom: 18px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .form-group.required label::after {
+            content: ' *';
+            color: #ff6b6b;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 25px;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            flex: 1;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+        
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+        
+        .message {
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+            display: none;
+            font-size: 14px;
+            border-left: 4px solid;
+        }
+        
+        .message.success {
+            display: block;
+            background: #f0fdf4;
+            color: #166534;
+            border-left-color: #22c55e;
+        }
+        
+        .message.error {
+            display: block;
+            background: #fef2f2;
+            color: #991b1b;
+            border-left-color: #ef4444;
+        }
+        
+        .message.info {
+            display: block;
+            background: #f0f9ff;
+            color: #0c2340;
+            border-left-color: #0284c7;
+        }
+        
+        .result-box {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .result-box.show {
+            display: block;
+        }
+        
+        .result-item {
+            margin-bottom: 12px;
+            word-break: break-all;
+        }
+        
+        .result-item label {
+            font-weight: 500;
+            color: #666;
+            font-size: 12px;
+            text-transform: uppercase;
+            display: block;
+            margin-bottom: 4px;
+        }
+        
+        .result-item .value {
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+            color: #333;
+            border: 1px solid #eee;
+        }
+        
+        .copy-btn {
+            display: inline-block;
+            padding: 4px 8px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 8px;
+            transition: background 0.3s;
+        }
+        
+        .copy-btn:hover {
+            background: #764ba2;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            color: #999;
+            padding: 20px;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f0f0f0;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .search-section {
+            margin-top: 20px;
+        }
+        
+        .orders-list {
+            display: none;
+            margin-top: 20px;
+        }
+        
+        .orders-list.show {
+            display: block;
+        }
+        
+        .order-item {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .order-item:hover {
+            background: #f0f0f0;
+        }
+        
+        .order-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .order-item-id {
+            font-weight: 500;
+            color: #333;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .status-pending {
+            background: #fef3c7;
+            color: #b45309;
+        }
+        
+        .status-approved {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-rejected {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .order-item-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            font-size: 13px;
+            color: #666;
+        }
+        
+        .info-row {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .info-row label {
+            font-weight: 500;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <div class="header">
+            <h1>🔐 KYC 管理后台</h1>
+            <button class="logout-btn" id="logoutBtn">退出登录</button>
+        </div>
+        
+        <!-- 主内容 -->
+        <div class="main-content">
+            <!-- 左侧：生成链接 -->
+            <div class="card">
+                <h2>📝 生成验证链接</h2>
+                
+                <form id="generateForm">
+                    <div class="form-group required">
+                        <label for="userId">用户号 *</label>
+                        <input 
+                            type="text" 
+                            id="userId" 
+                            name="user_id" 
+                            placeholder="如: alipay_user_123"
+                            required
+                        >
+                    </div>
+                    
+                    <div class="form-group required">
+                        <label for="orderId">订单号 *</label>
+                        <input 
+                            type="text" 
+                            id="orderId" 
+                            name="order_id" 
+                            placeholder="如: order_20251208_001"
+                            required
+                        >
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="buyerName">买家名称</label>
+                        <input 
+                            type="text" 
+                            id="buyerName" 
+                            name="buyer_name" 
+                            placeholder="买家的名字"
+                        >
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="buyerPhone">买家电话</label>
+                        <input 
+                            type="tel" 
+                            id="buyerPhone" 
+                            name="buyer_phone" 
+                            placeholder="13800138000"
+                        >
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="buyerEmail">买家邮箱</label>
+                        <input 
+                            type="email" 
+                            id="buyerEmail" 
+                            name="buyer_email" 
+                            placeholder="buyer@example.com"
+                        >
+                    </div>
+                    
+                    <div class="button-group">
+                        <button type="submit" class="btn btn-primary" id="generateBtn">
+                            生成链接
+                        </button>
+                        <button type="reset" class="btn btn-secondary">
+                            清空
+                        </button>
+                    </div>
+                    
+                    <div class="message" id="generateMsg"></div>
+                </form>
+                
+                <!-- 结果框 -->
+                <div class="result-box" id="resultBox">
+                    <div class="result-item">
+                        <label>✅ 验证链接生成成功</label>
+                    </div>
+                    
+                    <div class="result-item">
+                        <label>验证链接</label>
+                        <div style="display: flex; align-items: center;">
+                            <div class="value" id="verificationLink" style="flex: 1;"></div>
+                            <button type="button" class="copy-btn" onclick="copyToClipboard('verificationLink')">
+                                复制
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="result-item">
+                        <label>验证令牌</label>
+                        <div style="display: flex; align-items: center;">
+                            <div class="value" id="verificationToken" style="flex: 1;"></div>
+                            <button type="button" class="copy-btn" onclick="copyToClipboard('verificationToken')">
+                                复制
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="result-item">
+                        <label>Applicant ID</label>
+                        <div class="value" id="applicantId"></div>
+                    </div>
+                    
+                    <div class="result-item">
+                        <label>创建时间</label>
+                        <div class="value" id="createdAt"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 右侧：查询状态 -->
+            <div class="card">
+                <h2>🔍 查询验证状态</h2>
+                
+                <form id="checkForm">
+                    <div class="form-group required">
+                        <label for="checkOrderId">订单号 *</label>
+                        <input 
+                            type="text" 
+                            id="checkOrderId" 
+                            name="order_id" 
+                            placeholder="输入订单号查询状态"
+                            required
+                        >
+                    </div>
+                    
+                    <div class="button-group">
+                        <button type="submit" class="btn btn-primary" id="checkBtn">
+                            查询状态
+                        </button>
+                        <button type="reset" class="btn btn-secondary">
+                            清空
+                        </button>
+                    </div>
+                    
+                    <div class="message" id="checkMsg"></div>
+                </form>
+                
+                <!-- 状态结果 -->
+                <div class="result-box" id="statusBox">
+                    <div class="result-item">
+                        <label>订单号</label>
+                        <div class="value" id="statusOrderId"></div>
+                    </div>
+                    
+                    <div class="result-item">
+                        <label>验证状态</label>
+                        <div class="value" id="verificationStatus"></div>
+                    </div>
+                    
+                    <div class="result-item">
+                        <label>用户号</label>
+                        <div class="value" id="statusUserId"></div>
+                    </div>
+                    
+                    <div class="result-item">
+                        <label>买家信息</label>
+                        <div id="buyerInfo" style="font-size: 13px;"></div>
+                    </div>
+                    
+                    <div class="result-item" id="reportSection" style="display: none;">
+                        <label>验证报告</label>
+                        <div id="reportUrls"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 登出
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            if (confirm('确认要退出登录吗?')) {
+                await fetch('/admin-manual/logout', { method: 'POST' });
+                window.location.href = '/admin-manual/';
+            }
+        });
+        
+        // 生成链接
+        document.getElementById('generateForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = {
+                user_id: document.getElementById('userId').value.trim(),
+                order_id: document.getElementById('orderId').value.trim(),
+                buyer_name: document.getElementById('buyerName').value.trim(),
+                buyer_phone: document.getElementById('buyerPhone').value.trim(),
+                buyer_email: document.getElementById('buyerEmail').value.trim()
+            };
+            
+            if (!formData.user_id || !formData.order_id) {
+                showMessage('generateMsg', '用户号和订单号不能为空', 'error');
+                return;
+            }
+            
+            const btn = document.getElementById('generateBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>生成中...';
+            
+            try {
+                const response = await fetch('/admin-manual/generate-link', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // 显示结果
+                    document.getElementById('verificationLink').textContent = data.verification_link;
+                    document.getElementById('verificationToken').textContent = data.verification_token;
+                    document.getElementById('applicantId').textContent = data.applicant_id;
+                    document.getElementById('createdAt').textContent = new Date(data.created_at).toLocaleString('zh-CN');
+                    
+                    document.getElementById('resultBox').classList.add('show');
+                    showMessage('generateMsg', '✅ 验证链接生成成功', 'success');
+                    
+                    // 清空表单
+                    document.getElementById('generateForm').reset();
+                } else {
+                    showMessage('generateMsg', data.error || '生成失败', 'error');
+                }
+            } catch (error) {
+                showMessage('generateMsg', '网络错误: ' + error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '生成链接';
+            }
+        });
+        
+        // 查询状态
+        document.getElementById('checkForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const orderId = document.getElementById('checkOrderId').value.trim();
+            if (!orderId) {
+                showMessage('checkMsg', '订单号不能为空', 'error');
+                return;
+            }
+            
+            const btn = document.getElementById('checkBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>查询中...';
+            
+            try {
+                const response = await fetch('/admin-manual/check-status', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ order_id: orderId })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // 显示状态
+                    const statusMap = {
+                        'pending': '⏳ 等待中',
+                        'approved': '✅ 已通过',
+                        'rejected': '❌ 已拒绝',
+                        'expired': '⏰ 已过期'
+                    };
+                    
+                    document.getElementById('statusOrderId').textContent = data.order_id;
+                    document.getElementById('verificationStatus').innerHTML = 
+                        `<span class="status-badge status-${data.verification_status}">${statusMap[data.verification_status] || data.verification_status}</span>`;
+                    document.getElementById('statusUserId').textContent = data.user_id;
+                    
+                    // 买家信息
+                    const buyerInfo = data.buyer_info;
+                    document.getElementById('buyerInfo').innerHTML = `
+                        <div>${buyerInfo.name || '-'}</div>
+                        <div>${buyerInfo.phone || '-'}</div>
+                        <div>${buyerInfo.email || '-'}</div>
+                    `;
+                    
+                    // 报告链接
+                    if (data.report_urls) {
+                        const reportSection = document.getElementById('reportSection');
+                        reportSection.style.display = 'block';
+                        
+                        let reportHTML = '';
+                        for (const [lang, formats] of Object.entries(data.report_urls)) {
+                            reportHTML += `<div style="margin: 10px 0;"><strong>${lang.toUpperCase()}</strong>:`;
+                            for (const [format, url] of Object.entries(formats)) {
+                                reportHTML += ` <a href="${url}" target="_blank" style="color: #667eea;">${format.toUpperCase()}</a>`;
+                            }
+                            reportHTML += '</div>';
+                        }
+                        document.getElementById('reportUrls').innerHTML = reportHTML;
+                    } else {
+                        document.getElementById('reportSection').style.display = 'none';
+                        if (data.report_status === 'downloading') {
+                            showMessage('checkMsg', '📥 报告生成中，请稍候...', 'info');
+                        }
+                    }
+                    
+                    document.getElementById('statusBox').classList.add('show');
+                    showMessage('checkMsg', '', 'success');
+                } else {
+                    showMessage('checkMsg', data.error || '查询失败', 'error');
+                    document.getElementById('statusBox').classList.remove('show');
+                }
+            } catch (error) {
+                showMessage('checkMsg', '网络错误: ' + error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '查询状态';
+            }
+        });
+        
+        // 辅助函数
+        function showMessage(elementId, message, type) {
+            const el = document.getElementById(elementId);
+            el.textContent = message;
+            el.className = 'message ' + type;
+        }
+        
+        function copyToClipboard(elementId) {
+            const text = document.getElementById(elementId).textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('已复制到剪贴板');
+            }).catch(() => {
+                alert('复制失败');
+            });
+        }
+    </script>
+</body>
+</html>

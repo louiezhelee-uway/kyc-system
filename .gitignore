@@ -1,0 +1,58 @@
+# 虚拟环境
+venv/
+env/
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Flask
+instance/
+.webassets-cache
+
+# 测试和覆盖
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 数据库
+*.db
+*.sqlite
+*.sqlite3
+
+# 报告目录（可选保留在 Git 中用于示例）
+reports/sumsub/
+
+# pip
+pip-log.txt
+pip-delete-this-directory.txt
+

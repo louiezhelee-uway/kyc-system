@@ -59,6 +59,15 @@ def create_app():
         import traceback
         traceback.print_exc()
     
+    try:
+        from app.routes import admin_manual
+        app.register_blueprint(admin_manual.bp)
+        print("✅ admin_manual 蓝图已注册 (隐秘管理后台)")
+    except Exception as e:
+        print(f"❌ admin_manual 蓝图注册失败: {e}")
+        import traceback
+        traceback.print_exc()
+    
     # Global error handler (只处理非 HTTP 异常)
     @app.errorhandler(Exception)
     def handle_exception(error):
