@@ -5,7 +5,7 @@
 
 from flask import Blueprint, request, jsonify, render_template, session
 from app.models import Order, Verification
-from app.services.sumsub_service import SumsubService
+from app.services import sumsub_service
 from app.services.sumsub_report_downloader import SumsubReportDownloader
 from app import db
 import os
@@ -172,12 +172,7 @@ def generate_verification_link():
             print(f"  ✅ 创建新订单: {order.id}")
         
         # 生成验证链接
-        sumsub_service = SumsubService()
-        verification_link = sumsub_service.create_verification(
-            order_id=order.id,
-            user_id=user_id,
-            buyer_name=buyer_name
-        )
+        verification_link = sumsub_service.create_verification(order)
         
         if not verification_link:
             return jsonify({
